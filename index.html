@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-
+scalable=no">
+<title>League Side Action Poker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root {
+--bg-green: #1b4d3e;
+--card-black: #1e1e1e;
+--orange-neon: #ff6600;
+--white-text: #ffffff;
+}
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+background-color: var(--bg-green);
+color: var(--white-text);
+margin: 0;
+padding: 15px;
+display: flex;
+flex-direction: column;
+align-items: center;
+min-height: 100vh;
+box-sizing: border-box;
+}
+.screen { display: none; width: 100%; max-width: 500px; text-align: center; }
+.screen.active { display: flex; flex-direction: column; gap: 20px; }
+h1 { color: var(--orange-neon); font-size: 32px; margin-bottom: 5px; text-transform:
+uppercase; letter-spacing: 1px; }
+.input-group { display: flex; flex-direction: column; text-align: left; gap: 5px; }
+label { font-weight: 600; font-size: 14px; }
+input, select {
+background: rgba(0,0,0,0.4);
+border: 2px solid var(--orange-neon);
+color: white;
+padding: 12px;
+border-radius: 8px;
+font-size: 16px;
+}
+.btn {
+background-color: var(--card-black);
+color: var(--orange-neon);
+border: 2px solid var(--orange-neon);
+padding: 14px;
+font-size: 18px;
+font-weight: bold;
+border-radius: 12px;
+cursor: pointer;
+text-transform: uppercase;
+box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.btn:active { transform: scale(0.98); }
+.btn-action { background-color: var(--orange-neon); color: var(--card-black); }
+.hand-container { display: flex; gap: 8px; justify-content: center; min-height: 120px;
+padding: 10px; overflow-x: auto; width: 100%; }
+.poker-card {
+background-color: var(--card-black);
+border: 2px solid var(--orange-neon);
+border-radius: 8px;
+width: 70px;
+height: 105px;
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+padding: 8px;
+box-sizing: border-box;
+color: var(--orange-neon);
+font-weight: bold;
+font-size: 18px;
+position: relative;
+box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+.poker-card.selected { border-color: #ffffff; box-shadow: 0 0 15px #ffffff; transform:
+translateY(-10px); }
+.notification-banner {
+position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+background: #d9534f; color: white; padding: 15px 25px; border-radius: 8px;
+font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 1000; display: none;
+}
+.status-table { width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.3); border-
+radius: 8px; overflow: hidden; margin-top: 15px; }
+.status-table th, .status-table td { padding: 12px; text-align: left; border-bottom: 1px
+solid rgba(255,255,255,0.1); }
+.status-table th { background: var(--card-black); color: var(--orange-neon); }
+.tiny-card {
+display: inline-block; background: var(--card-black); color: var(--orange-neon);
+border: 1px solid var(--orange-neon); font-size: 10px; padding: 2px 4px; border-radius:
+3px; margin-right: 2px;
+}
+</style>
+</head>
+<body>
+<div id="alertBanner" class="notification-banner">ALERT: GO TO THE DEALER'S LANE AND PAY!</div>
+<!-- SCREEN 1: TITLE SCREEN -->
+<div id="screenTitle" class="screen active">
+<div style="margin-top: 40px;">
+<h1>League Side Action</h1>
+<p style="color: #a3c2b2; letter-spacing: 2px;">POKER LEAGUE MANAGER</p>
+</div>
+<button class="btn" onclick="navigateTo('screenPlayerSetup')">Log In As Player</button>
+<button class="btn btn-action" onclick="navigateTo('screenDealerSetup')">Log In As Dealer</
+button>
+</div>
+<!-- SCREEN 2: PLAYER SETUP -->
+<div id="screenPlayerSetup" class="screen">
+<h1>Player Profile</h1>
+<div class="input-group">
+<label>Create Unique Username</label>
+<input type="text" id="playerUsername" placeholder="e.g., BowlingStrikers">
+</div>
+<div class="input-group">
+<label>Identify Your Pair of Lanes</label>
+<input type="text" id="playerLanes" placeholder="e.g., Lanes 23-24">
+</div>
+<button class="btn btn-action" onclick="joinLobby()">Join Game Lobby</button>
+</div>
+<!-- SCREEN 3: DEALER SETUP -->
+<div id="screenDealerSetup" class="screen">
+<h1>Dealer Setup</h1>
+<div class="input-group">
+<label>Dealer Username</label>
+<input type="text" id="dealerUsername" placeholder="e.g., TheDealer44">
+</div>
+<div class="input-group">
+<label>Dealer Lanes Location</label>
+<input type="text" id="dealerLanes" placeholder="e.g., Lanes 11-12">
+</div>
+<button class="btn btn-action" onclick="createMatch()">Create Match Workspace</button>
+</div>
+<!-- SCREEN 4: THE LOBBY CONTAINER -->
+<div id="screenLobby" class="screen">
+<h1>Game Lobby</h1>
+<p id="lobbyMetaInfo">Waiting for Dealer to initialize match sequence...</p>
+<table class="status-table">
+<thead><tr><th>Player</th><th>Lanes</th><th>Payment Tracking</th></tr></thead>
+<tbody id="lobbyTableBody"><!-- JavaScript Population --></tbody>
+</table>
+<button id="startMatchBtn" class="btn btn-action" style="display:none;"
+onclick="startMatch()">Start Match (Game 1)</button>
+</div>
+<!-- SCREEN 5: THE POKER GAME ROOM -->
+<div id="screenGameRoom" class="screen">
+<div style="display:flex; justify-content:space-between; align-items:center;">
+<h2 id="roundTitle" style="color:var(--orange-neon); margin:0;">Game 1</h2>
+<div id="activeLanesLabel" style="font-size:12px; background:rgba(0,0,0,0.3); padding:4px
+10px; border-radius:20px;">Lanes</div>
+</div>
+<div class="hand-container" id="playerHandDisplay"></div>
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+<button class="btn btn-action" onclick="triggerDealPopup()">Deal Card</button>
+<button class="btn" onclick="executeDiscard()">Discard Card</button>
+</div>
+<button class="btn" style="border-color:#d9534f; color:#d9534f;"
+onclick="submitHand()">Submit Final Hand</button>
+<div style="text-align:left; margin-top:10px;">
+<h3 style="margin-bottom:5px; font-size:16px; text-transform:uppercase;
+color:#a3c2b2;">Field Update</h3>
+<table class="status-table">
+<thead><tr><th>Opponent</th><th>Cards</th><th>Live Status / Hand</th></tr></thead>
+<tbody id="opponentGameTableBody"></tbody>
+</table>
+</div>
+<button id="dealerCloseRoundBtn" class="btn btn-action" style="display:none; width:100%;
+margin-top:15px;" onclick="dealerCloseRound()">Dealer: Close Game Round</button>
+</div>
+<script>
+// Configuration State Matrix
+let appState = {
+role: null,
+username: '',
+lanes: '',
+currentGame: 1,
+myHand: []
+function navigateTo(screenId) {
+document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+document.getElementById(screenId).classList.add('active');
+};
+}
+function joinLobby() {
+appState.role = 'player';
+appState.username = document.getElementById('playerUsername').value;
+appState.lanes = document.getElementById('playerLanes').value;
+if(!appState.username || !appState.lanes) return alert('Please input all registration
+parameters.');
+  document.getElementById('lobbyMetaInfo').innerText = `Welcome ${appState.username}.
+Awaiting match deployment by dealer...`;
+navigateTo('screenLobby');
+simulateLobbyEngine();
+}
+function createMatch() {
+appState.role = 'dealer';
+appState.username = document.getElementById('dealerUsername').value;
+appState.lanes = document.getElementById('dealerLanes').value;
+if(!appState.username || !appState.lanes) return alert('Please input all registration
+parameters.');
+document.getElementById('lobbyMetaInfo').innerText = "Verify player buy-ins. Check off
+payment indicators before initiating Game 1.";
+document.getElementById('startMatchBtn').style.display = "block";
+navigateTo('screenLobby');
+simulateLobbyEngine();
+}
+function simulateLobbyEngine() {
+const targetTable = document.getElementById('lobbyTableBody');
+let content = `
+<tr><td>${appState.username} (${appState.role.toUpperCase()})</td><td>$
+{appState.lanes}</td><td>✅ Paid</td></tr>
+<tr><td>BowlerDave</td><td>Lanes 15-16</td><td>${appState.role === 'dealer' ?
+'<select><option>Unpaid</option><option selected>Paid</option></select>' : '✅ Paid'}</td></tr>
+<tr><td>SplitQueen</td><td>Lanes 17-18</td><td>${appState.role === 'dealer' ?
+'<select><option selected>Unpaid</option><option>Paid</option></select>' : '❌ Unpaid'}</td></tr>
+`;
+targetTable.innerHTML = content;
+// Unpaid trigger warning simulator for demonstration
+if(appState.role === 'player') {
+setTimeout(() => {
+document.getElementById('alertBanner').style.display = "block";
+}, 3000);
+}
+}
+function startMatch() {
+navigateTo('screenGameRoom');
+if(appState.role === 'dealer') {
+document.getElementById('dealerCloseRoundBtn').style.display = "block";
+}
+document.getElementById('activeLanesLabel').innerText = appState.lanes;
+renderHand();
+renderOpponentTable();
+}
+function triggerDealPopup() {
+let choice = confirm("Confirm Score Action Tracker:
+Press OK for a STRIKE (X)
+Press CANCEL for a SPLIT CONVERSION (O)");
+  let cardsToDraw = (appState.myHand.length === 0) ? 2 : 1;
+for(let i=0; i<cardsToDraw; i++) {
+appState.myHand.push(generateRandomCard());
+}
+renderHand();
+if(appState.myHand.length > 5) {
+alert("Rule Exception Intercept: Hand limit exceeded! You must select an active card
+and execute Discard.");
+}
+}
+function generateRandomCard() {
+const values = ['2','3','4','5','6','7','8','9','10','J','Q','K','A','Joker'];
+const suits = ['♠','♥','♦','♣'];
+let v = values[Math.floor(Math.random() * values.length)];
+if(v === 'Joker') return { v: 'JK', s: '🃏' };
+return { v: v, s: suits[Math.floor(Math.random() * suits.length)] };
+}
+function renderHand() {
+const display = document.getElementById('playerHandDisplay');
+display.innerHTML = '';
+appState.myHand.forEach((card, index) => {
+let cardDiv = document.createElement('div');
+cardDiv.className = 'poker-card';
+cardDiv.onclick = () => {
+document.querySelectorAll('.poker-card').forEach(c =>
+c.classList.remove('selected'));
+cardDiv.classList.add('selected');
+cardDiv.dataset.selectedIndex = index;
+</div>`;
+};
+cardDiv.innerHTML = `<div>${card.v}</div><div style="align-self:flex-end;">${card.s}
+display.appendChild(cardDiv);
+});
+}
+your target.");
+function executeDiscard() {
+let selected = document.querySelector('.poker-card.selected');
+if(!selected) return alert("Please touch a card within your interface window to choose
+let idx = selected.dataset.selectedIndex;
+appState.myHand.splice(idx, 1);
+renderHand();
+}
+function renderOpponentTable() {
+const container = document.getElementById('opponentGameTableBody');
+container.innerHTML = `
+<tr><td>BowlerDave</td><td>3 Cards</td><td><span style="color:#a3c2b2;">Drawing...</
+span></td></tr>
+<tr><td>SplitQueen</td><td>5 Cards</td><td><div class="tiny-card">A♠</div><div
+class="tiny-card">10♥</div><div class="tiny-card">JK🃏</div> (Submitted)</td></tr>
+`;
+}
+function submitHand() {
+if(appState.myHand.length !== 5) return alert("Validation Fault: Game rules demand a
+precise 5-card layout layout to close out your frame.");
+alert("Game Frame Submitted successfully! Unlocking subsequent game tracking portal.");
+appState.currentGame++;
+if(appState.currentGame <= 3) {
+document.getElementById('roundTitle').innerText = `Game ${appState.currentGame}`;
+appState.myHand = [];
+renderHand();
+} else {
+alert("All three league frames completed. Stand by for the dealer wrap-up rollup
+metrics.");
+}
+}
+function dealerCloseRound() {
+alert(`Game ${appState.currentGame} tracking finalized by dealer. Pushes broadcasted to
+winners containing payout collection coordinates: ${appState.lanes}`);
+}
+</script>
+</body>
+</html>
